@@ -1,0 +1,33 @@
+#!/bin/bash
+# Store some useful experiment specific variables that are used by
+# scripts in one place
+
+export EXPT='simple-daq'
+export EXPT_IP='nmr-daq'
+export EXPT_DIR='/home/newg2/Applications/simple-daq'
+export MSERVER_PORT='7071'
+export MHTTPD_PORT='8081'
+export ROODY_PORT='9091'
+
+export EXT_IP=(
+    'nmr-cave'
+)
+
+export MIDAS_UTIL=(
+    'mserver'
+    'mhttpd'
+    'mlogger'
+)
+
+export EXPT_FE=(
+    'fe_sis3316'
+#    'fe_sis3302'
+)
+
+export EXPT_AN=(
+#    'an_sis3302'
+#    'an_tekscope'
+#    'an_online_monitor'
+)
+
+# end script
