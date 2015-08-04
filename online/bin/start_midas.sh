@@ -19,9 +19,9 @@ cmd="mhttpd  -e $EXPT $addresslist -p $MHTTPD_PORT$(printf \\r)"
 screen -dmS "${EXPT}.mhttpd"
 screen -S "${EXPT}.mhttpd" -p 0 -rX stuff "$cmd"
 
-cmd="mlogger -e $EXPT$(printf \\r)"
-screen -dmS "${EXPT}.mlogger"
-screen -S "${EXPT}.mlogger" -p 0 -rX stuff "$cmd"
+# cmd="mlogger -e $EXPT$(printf \\r)"
+# screen -dmS "${EXPT}.mlogger"
+# screen -S "${EXPT}.mlogger" -p 0 -rX stuff "$cmd"
 
 unset cmd
 unset addresslist
