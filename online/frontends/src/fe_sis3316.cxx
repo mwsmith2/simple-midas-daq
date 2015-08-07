@@ -179,7 +179,7 @@ INT begin_of_run(INT run_number, char *error)
   
   // Get the run number out of the MIDAS database.
   strcpy(filename, str);
-  sprintf(str, "run_%05d.root", runinfo.run_number);
+  sprintf(str, "fe_sis3316_run_%05d.root", runinfo.run_number);
   strcat(filename, str);
 
   // Set up the ROOT data output.
@@ -220,6 +220,8 @@ INT end_of_run(INT run_number, char *error)
     delete root_file;
     run_in_progress = false;
   }
+
+  // Merge the files into a single file @TODO
   
   return SUCCESS;
 }

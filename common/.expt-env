@@ -21,7 +21,7 @@ export MIDAS_UTIL=(
 
 export EXPT_FE=(
     'fe_sis3316'
-#    'fe_sis3302'
+    'fe_sis3302'
 )
 
 export EXPT_AN=(
