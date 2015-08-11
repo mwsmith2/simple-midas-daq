@@ -320,11 +320,6 @@ INT read_trigger_event(char *pevent, INT off)
       data.sis_3302_vec[count++] = sis;
     }
 
-    count = 0;
-    for (auto &sis : event_manager->GetCurrentEvent().sis_3350_vec) {
-      data.sis_3350_vec[count++] = sis;
-    }
-
     // Pop the event now that we are done copying it.
     event_manager->PopCurrentEvent();
 
@@ -348,7 +343,7 @@ INT read_trigger_event(char *pevent, INT off)
     count = 0;
     for (auto &sis : data.sis_3302_vec) {
       
-      sprintf(bk_name, "S%01iTR", count++);
+      sprintf(bk_name, "02_%01i", count++);
       bk_create(pevent, bk_name, TID_WORD, &pdata);
       std::copy(&sis.trace[0][0], 
                 &sis.trace[0][0] + SIS_3302_CH*SIS_3302_LN, 

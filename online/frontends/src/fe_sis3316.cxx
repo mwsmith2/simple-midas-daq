@@ -336,7 +336,7 @@ INT read_trigger_event(char *pevent, INT off)
     count = 0;
     for (auto &sis : data.sis_3316_vec) {
       
-      sprintf(bk_name, "S%01iTR", count++);
+      sprintf(bk_name, "16_%01i", count++);
       bk_create(pevent, bk_name, TID_WORD, &pdata);
       std::copy(&sis.trace[0][0], 
                 &sis.trace[0][0] + SIS_3316_CH*SIS_3316_LN, 

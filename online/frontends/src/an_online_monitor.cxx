@@ -61,9 +61,8 @@ INT ana_resume_run(INT run_number, char *error);
 
 // We anticipate three SIS3302 digitizers, but only use one for now.
 BANK_LIST trigger_bank_list[] = {
-  {"S0TR", TID_WORD, SIS_3302_LN * SIS_3302_CH, NULL},
-  {"OSCV", TID_DOUBLE, TEK_SCOPE_LN * TEK_SCOPE_CH, NULL},
-  {"OSCT", TID_DOUBLE, TEK_SCOPE_LN * TEK_SCOPE_CH, NULL},
+  {"16_0", TID_WORD, SIS_3316_LN * SIS_3316_CH, NULL},
+  {"02_0", TID_WORD, SIS_3302_LN * SIS_3302_CH, NULL},
   {""}
 };
 
@@ -120,7 +119,7 @@ INT analyzer_init()
   gStyle->SetOptStat(false);
 
   // Check if we need to put the images in.
-  char keyname[] = "Custom/Images/osci_ch03_fft.gif/Background";
+  char keyname[] = "Custom/Images/sis3302_ch03_fft.gif/Background";
   cm_get_experiment_database(&hDB, NULL);
   db_find_key(hDB, 0, keyname, &hkey);
 
@@ -129,18 +128,18 @@ INT analyzer_init()
   }
    
   //---- user code to book histos ------------------------------------------//
-  for (i = 0; i < TEK_SCOPE_CH; i++) {
+  for (i = 0; i < SIS_3316_CH; i++) {
     char title[32], name[32], key[64], figpath[64];
 
     // Now add to the odb
-    sprintf(name, "osci_ch%02i_wf", i);
+    sprintf(name, "sis3302_ch%02i_wf", i);
     sprintf(key, "/Custom/Images/%s.gif/Background", name);
     sprintf(figpath, "%s/%s.gif", figdir.c_str(), name);
     db_create_key(hDB, 0, key, TID_STRING);
     db_set_value(hDB, 0, key, figpath, sizeof(figpath), 1, TID_STRING);
 
     // Now add to the odb
-    sprintf(name, "osci_ch%02i_fft", i);
+    sprintf(name, "sis3302_ch%02i_fft", i);
     sprintf(key, "/Custom/Images/%s.gif/Background", name);
     sprintf(figpath, "%s/%s.gif", figdir.c_str(), name);
     db_create_key(hDB, 0, key, TID_STRING);
@@ -151,14 +150,14 @@ INT analyzer_init()
     char title[32], name[32], key[64], figpath[64];
 
     // Now add to the odb
-    sprintf(name, "sis_ch%02i_wf", i);
+    sprintf(name, "sis3302_ch%02i_wf", i);
     sprintf(key, "/Custom/Images/%s.gif/Background", name);
     sprintf(figpath, "%s/%s.gif", figdir.c_str(), name);
     db_create_key(hDB, 0, key, TID_STRING);
     db_set_value(hDB, 0, key, figpath, sizeof(figpath), 1, TID_STRING);
 
     // Now add to the odb
-    sprintf(name, "sis_ch%02i_fft", i);
+    sprintf(name, "sis3302_ch%02i_fft", i);
     sprintf(key, "/Custom/Images/%s.gif/Background", name);
     sprintf(figpath, "%s/%s.gif", figdir.c_str(), name);
     db_create_key(hDB, 0, key, TID_STRING);
@@ -275,12 +274,10 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 
   unsigned int ch, idx;
   WORD *pvme;
-  double *poscv;
-  double *posct;
   float *pfreq;
 
   // Look for the first SIS3302 traces.
-  if (bk_locate(pevent, "S0TR", &pvme) != 0) {
+  if (bk_locate(pevent, "02_0", &pvme) != 0) {
 
     cm_msg(MINFO, "online_analyzer", "Processing a sis3302 event.");
 
@@ -300,14 +297,14 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 
       auto myfid = fid::FID(wf, tm);
 
-      sprintf(name, "sis_ch%02i_wf", ch);
+      sprintf(name, "sis3316_ch%02i_wf", ch);
       sprintf(title, "Channel %i Trace", ch);
-      ph_wfm = new TH1F(name, title, TEK_SCOPE_LN, myfid.tm()[0], 
+      ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
                         myfid.tm()[myfid.tm().size() - 1]);
       
-      sprintf(name, "sis_ch%02i_fft", ch);
+      sprintf(name, "sis3316_ch%02i_fft", ch);
       sprintf(title, "Channel %i Fourier Transform", ch);
-      ph_fft = new TH1F(name, title, TEK_SCOPE_LN, myfid.fftfreq()[0], 
+      ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
                         myfid.fftfreq()[myfid.fftfreq().size() - 1]);
 
       // One histogram gets the waveform and another with the fft power.
@@ -344,36 +341,36 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
     }
   }
 
-  // Look for the first TEKSCOPE traces.
-  if ((bk_locate(pevent, "OSCV", &poscv) != 0) &&
-      (bk_locate(pevent, "OSCT", &posct) != 0)) {
+  // Look for the first SIS3316 traces.
+  if (bk_locate(pevent, "16_0", &pvme) != 0) {
 
-    cm_msg(MINFO, "online_analyzer", "Processing a tekscope event.");
+    cm_msg(MINFO, "online_analyzer", "Processing a sis3316 event.");
 
-    wf.resize(TEK_SCOPE_LN);
-    tm.resize(TEK_SCOPE_LN);
+    wf.resize(SIS_3316_LN);
+    tm.resize(SIS_3316_LN);
+
+    // Set up the time vector.
+    for (idx = 0; idx < SIS_3316_LN; idx++){
+      tm[idx] = -1.0 + idx * 0.0001;  // @10 MHz, t = [-1ms, 9ms]
+    }
 
     // Copy and analyze each channel's FID separately.
-    for (ch = 0; ch < TEK_SCOPE_CH; ++ch) {
+    for (ch = 0; ch < SIS_3316_CH; ++ch) {
 
-      std::copy(&poscv[ch*TEK_SCOPE_LN], 
-                &poscv[(ch + 1)*TEK_SCOPE_LN], 
+      std::copy(&pvme[ch*SIS_3316_LN], 
+                &pvme[(ch + 1)*SIS_3316_LN], 
                 wf.begin());
-
-      std::copy(&posct[ch*TEK_SCOPE_LN], 
-                &posct[(ch + 1)*TEK_SCOPE_LN], 
-                tm.begin());
 
       auto myfid = fid::FID(wf, tm);
 
-      sprintf(name, "osci_ch%02i_wf", ch);
+      sprintf(name, "sis3302_ch%02i_wf", ch);
       sprintf(title, "Channel %i Trace", ch + 1);
-      ph_wfm = new TH1F(name, title, TEK_SCOPE_LN, myfid.tm()[0], 
+      ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
                         myfid.tm()[myfid.tm().size() - 1]);
       
-      sprintf(name, "osci_ch%02i_fft", ch);
+      sprintf(name, "sis3302_ch%02i_fft", ch);
       sprintf(title, "Channel %i Fourier Transform", ch + 1);
-      ph_fft = new TH1F(name, title, TEK_SCOPE_LN, myfid.fftfreq()[0], 
+      ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
                         myfid.fftfreq()[myfid.fftfreq().size() - 1]);
 
       // One histogram gets the waveform and another with the fft power.
@@ -383,7 +380,7 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
       }
 
       // The waveform has more samples.
-      for (; idx < TEK_SCOPE_LN; ++idx) {
+      for (; idx < SIS_3316_LN; ++idx) {
         ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
       }
       
@@ -410,3 +407,37 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
   return CM_SUCCESS;
 }
 
+//-- Run Control Hooks -----------------------------------------------------//
+// cm_register_transition(TR_STOP, tr_stop_hook, 450);
+
+INT tr_stop_hook(INT run_number, char *error) {
+
+  //DATA part
+  HNDLE hDB, hkey;
+  INT status;
+  char str[256], filename[256];
+  int size;
+
+  TFile *pf_sis3302;
+  TFile *pf_sis3316;
+  TFile *pf_final;
+    
+  cm_get_experiment_database(&hDB, NULL);
+  db_find_key(hDB, 0, "/Logger/Data dir", &hkey);
+    
+  if (hkey) {
+    size = sizeof(str);
+    db_get_data(hDB, hkey, str, &size, TID_STRING);
+    if (str[strlen(str) - 1] != DIR_SEPARATOR) {
+      strcat(str, DIR_SEPARATOR_STR);
+    }
+  }
+
+  sprintf(filename, "%s/sis3302_run_%05.root", str, run_number);
+  TFile *pf_sis3302 = new TFile(filename);
+
+  sprintf(filename, "%s/sis3316_run_%05.root", str, run_number);
+  TFile *pf_sis3316 = new TFile(filename);
+
+  // TODO: finished the file merge function.
+}
