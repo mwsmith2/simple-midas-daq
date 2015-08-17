@@ -434,10 +434,10 @@ INT tr_stop_hook(INT run_number, char *error) {
   }
 
   sprintf(filename, "%s/sis3302_run_%05.root", str, run_number);
-  TFile *pf_sis3302 = new TFile(filename);
+  pf_sis3302 = new TFile(filename);
 
   sprintf(filename, "%s/sis3316_run_%05.root", str, run_number);
-  TFile *pf_sis3316 = new TFile(filename);
+  pf_sis3316 = new TFile(filename);
 
   // TODO: finished the file merge function.
 }
