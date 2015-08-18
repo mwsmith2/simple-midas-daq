@@ -15,7 +15,7 @@ cmd="mserver $addresslist -p $MSERVER_PORT$(printf \\r)"
 screen -dmS "${EXPT}.mserver"
 screen -S "${EXPT}.mserver" -p 0 -rX stuff "$cmd"
 
-cmd="mhttpd  -e $EXPT $addresslist -p $MHTTPD_PORT$(printf \\r)"
+cmd="mhttpd  -e $EXPT $addresslist --mg $MHTTPD_PORT$(printf \\r)"
 screen -dmS "${EXPT}.mhttpd"
 screen -S "${EXPT}.mhttpd" -p 0 -rX stuff "$cmd"
 
