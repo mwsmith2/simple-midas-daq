@@ -478,7 +478,7 @@ INT tr_stop_hook(INT run_number, char *error) {
   delete pf_sis3316;
 
   // Make sure the file was written and clean up.
-  pf_final = new TFile(filename, "recreate");
+  pf_final = new TFile(filename);
   
   if (!pf_final->IsZombie()) {
     char cmd[256];
