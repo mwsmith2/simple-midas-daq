@@ -25,9 +25,7 @@ export EXPT_FE=(
 )
 
 export EXPT_AN=(
-#    'an_sis3302'
-#    'an_tekscope'
-#    'an_online_monitor'
+    'an_online_monitor'
 )
 
 # end script
