@@ -57,6 +57,9 @@ INT ana_end_of_run(INT run_number, char *error);
 INT ana_pause_run(INT run_number, char *error);
 INT ana_resume_run(INT run_number, char *error);
 
+// My stop hook.
+INT tr_stop_hook(INT run_number, char *error);
+
 //-- Bank list --------------------------------------------------------------//
 
 // We anticipate three SIS3302 digitizers, but only use one for now.
@@ -98,6 +101,9 @@ INT analyzer_init()
   HNDLE hDB, hkey;
   char str[80];
   int i, size;
+
+  // Register my own stop hook.
+  cm_register_transition(TR_STOP, tr_stop_hook, 900);  
 
   // following code opens ODB structures to make them accessible
   // from the analyzer code as C structures 
@@ -297,12 +303,12 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 
       auto myfid = fid::FID(wf, tm);
 
-      sprintf(name, "sis3316_ch%02i_wf", ch);
+      sprintf(name, "sis3302_ch%02i_wf", ch);
       sprintf(title, "Channel %i Trace", ch);
       ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
                         myfid.tm()[myfid.tm().size() - 1]);
       
-      sprintf(name, "sis3316_ch%02i_fft", ch);
+      sprintf(name, "sis3302_ch%02i_fft", ch);
       sprintf(title, "Channel %i Fourier Transform", ch);
       ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
                         myfid.fftfreq()[myfid.fftfreq().size() - 1]);
@@ -363,12 +369,12 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 
       auto myfid = fid::FID(wf, tm);
 
-      sprintf(name, "sis3302_ch%02i_wf", ch);
+      sprintf(name, "sis3316_ch%02i_wf", ch);
       sprintf(title, "Channel %i Trace", ch + 1);
       ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
                         myfid.tm()[myfid.tm().size() - 1]);
       
-      sprintf(name, "sis3302_ch%02i_fft", ch);
+      sprintf(name, "sis3316_ch%02i_fft", ch);
       sprintf(title, "Channel %i Fourier Transform", ch + 1);
       ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
                         myfid.fftfreq()[myfid.fftfreq().size() - 1]);
@@ -408,8 +414,6 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 }
 
 //-- Run Control Hooks -----------------------------------------------------//
-// cm_register_transition(TR_STOP, tr_stop_hook, 450);
-
 INT tr_stop_hook(INT run_number, char *error) {
 
   //DATA part
@@ -421,6 +425,11 @@ INT tr_stop_hook(INT run_number, char *error) {
   TFile *pf_sis3302;
   TFile *pf_sis3316;
   TFile *pf_final;
+
+  TTree *pt_old_sis3302;
+  TTree *pt_old_sis3316;
+  TTree *pt_sis3302;
+  TTree *pt_sis3316;
     
   cm_get_experiment_database(&hDB, NULL);
   db_find_key(hDB, 0, "/Logger/Data dir", &hkey);
@@ -433,11 +442,51 @@ INT tr_stop_hook(INT run_number, char *error) {
     }
   }
 
-  sprintf(filename, "%s/sis3302_run_%05.root", str, run_number);
+  // Open all the files.
+  sprintf(filename, "%sfe_sis3302_run_%05i.root", str, run_number);
   pf_sis3302 = new TFile(filename);
+  if (!pf_sis3302->IsZombie()) {
+    pt_old_sis3302 = (TTree *)pf_sis3302->Get("t_sis3302");
+    std::cout << "Opened sis3302 file.\n";
+  } else {
+    std::cout << "Failed to open sis3302 file.\n";
+  }
 
-  sprintf(filename, "%s/sis3316_run_%05.root", str, run_number);
+  sprintf(filename, "%s/fe_sis3316_run_%05i.root", str, run_number);
   pf_sis3316 = new TFile(filename);
+  if (!pf_sis3316->IsZombie()) {
+    pt_old_sis3316 = (TTree *)pf_sis3316->Get("t_sis3316");
+    std::cout << "Opened sis3316 file.\n";
+  } else {
+    std::cout << "Failed to open sis3316 file.\n";
+  }
 
-  // TODO: finished the file merge function.
+  sprintf(filename, "%s/run_%05i.root", str, run_number);
+  pf_final = new TFile(filename, "recreate");
+
+  // Copy the trees from the other two and remove them.
+  pt_sis3302 = pt_old_sis3302->CloneTree();
+  pt_sis3316 = pt_old_sis3316->CloneTree();
+
+  pt_sis3302->Print();
+  pt_sis3316->Print();
+
+  pf_final->Write();
+
+  delete pf_final;
+  delete pf_sis3302;
+  delete pf_sis3316;
+
+  // Make sure the file was written and clean up.
+  pf_final = new TFile(filename, "recreate");
+  
+  if (!pf_final->IsZombie()) {
+    char cmd[256];
+    sprintf(cmd, "rm %s/fe_sis33*_run_%05i.root", str, run_number);
+    system(cmd);
+  }
+    
+  delete pf_final;
+
+  return CM_SUCCESS;
 }

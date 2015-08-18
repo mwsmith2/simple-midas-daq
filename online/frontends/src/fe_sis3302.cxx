@@ -183,7 +183,7 @@ INT begin_of_run(INT run_number, char *error)
 
   // Set up the ROOT data output.
   root_file = new TFile(filename, "recreate");
-  t = new TTree("t", "t");
+  t = new TTree("t_sis3302", "SIS3302 Data");
   t->SetAutoSave(0);
   t->SetAutoFlush(0);
 
