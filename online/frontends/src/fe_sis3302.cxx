@@ -108,6 +108,7 @@ TFile* root_file;
 TTree* t;
 bool run_in_progress = false;
 bool write_midas = true;
+bool write_root = true;
 daq::event_data data;
 daq::EventManagerBasic* event_manager;
 }
@@ -155,6 +156,7 @@ INT begin_of_run(INT run_number, char *error)
   //DATA part
   HNDLE hDB, hkey;
   INT status;
+  BOOL mstatus;
   char str[256], filename[256];
   int size;
     
@@ -175,40 +177,46 @@ INT begin_of_run(INT run_number, char *error)
     cm_msg(MERROR, "analyzer_init", "Cannot open \"/Runinfo\" tree in ODB");
     return 0;
   }
-  
-  // Get the run number out of the MIDAS database.
-  strcpy(filename, str);
-  sprintf(str, "fe_sis3302_run_%05d.root", runinfo.run_number);
-  strcat(filename, str);
 
-  // Set up the ROOT data output.
-  root_file = new TFile(filename, "recreate");
-  t = new TTree("t_sis3302", "SIS3302 Data");
-  t->SetAutoSave(0);
-  t->SetAutoFlush(0);
-
-  int count;
-  char branch_vars[100];
-  char branch_name[100];
-
-  count = 0;
-  for (auto &sis : data.sis_3302_vec) {
-
-    sprintf(branch_name, "sis_3302_%i", count);
-    sprintf(branch_vars, "system_clock/l:device_clock[%i]/l:trace[%i][%i]/s",
-	    SIS_3302_CH, SIS_3302_CH, SIS_3302_LN);
-    
-    t->Branch(branch_name, &data.sis_3302_vec[count++], branch_vars);
+  db_find_key(hDB, 0, "/Params/midas-output", &hkey);
+  if (hkey) {
+    size = sizeof(mstatus);
+    db_get_data(hDB, hkey, &mstatus, &size, TID_BOOL);
+    write_midas = mstatus;
   }
 
-  count = 0;
-  for (auto &sis : data.sis_3350_vec) {
+  db_find_key(hDB, 0, "/Params/root-output", &hkey);
+  if (hkey) {
+    size = sizeof(mstatus);
+    db_get_data(hDB, hkey, &mstatus, &size, TID_BOOL);
+    write_root = mstatus;
+  }
 
-    sprintf(branch_name, "sis_3350_%i", count);
-    sprintf(branch_vars, "system_clock/l:device_clock[%i]/l:trace[%i][%i]/s",
-	    SIS_3350_CH, SIS_3350_CH, SIS_3350_LN);
+  if (write_root) {
+    // Get the run number out of the MIDAS database.
+    strcpy(filename, str);
+    sprintf(str, "fe_sis3302_run_%05d.root", runinfo.run_number);
+    strcat(filename, str);
+
+    // Set up the ROOT data output.
+    root_file = new TFile(filename, "recreate");
+    t = new TTree("t_sis3302", "SIS3302 Data");
+    t->SetAutoSave(0);
+    t->SetAutoFlush(0);
+
+    int count;
+    char branch_vars[100];
+    char branch_name[100];
+
+    count = 0;
+    for (auto &sis : data.sis_3302_vec) {
+
+      sprintf(branch_name, "sis_3302_%i", count);
+      sprintf(branch_vars, "system_clock/l:device_clock[%i]/l:trace[%i][%i]/s",
+              SIS_3302_CH, SIS_3302_CH, SIS_3302_LN);
     
-    t->Branch(branch_name, &data.sis_3350_vec[count++], branch_vars);
+      t->Branch(branch_name, &data.sis_3302_vec[count++], branch_vars);
+    }
   }
 
   run_in_progress = true;
@@ -223,10 +231,15 @@ INT end_of_run(INT run_number, char *error)
 
   // Make sure we write the ROOT data.
   if (run_in_progress) {
-    t->Write();
-    root_file->Close();
+
+    if (write_root) {
+
+      t->Write();
+      root_file->Close();
     
-    delete root_file;
+      delete root_file;
+    }
+
     run_in_progress = false;
   }
   
@@ -312,7 +325,7 @@ INT read_trigger_event(char *pevent, INT off)
   WORD *pdata;
 
   // ROOT output
-  if (run_in_progress) {
+  if (run_in_progress && write_root) {
 
     // Copy the data
     count = 0;
@@ -336,9 +349,9 @@ INT read_trigger_event(char *pevent, INT off)
   }
 
   // And MIDAS output.
-  bk_init32(pevent);
-
   if (write_midas) {
+
+    bk_init32(pevent);
     
     count = 0;
     for (auto &sis : data.sis_3302_vec) {
