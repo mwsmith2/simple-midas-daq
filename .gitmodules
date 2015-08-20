@@ -1,0 +1,3 @@
+[submodule "common/code/mhelper"]
+	path = common/code/mhelper
+	url = https://github.com/mwsmith2/mhelper
