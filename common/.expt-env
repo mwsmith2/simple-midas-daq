@@ -16,7 +16,7 @@ export EXT_IP=(
 export MIDAS_UTIL=(
     'mserver'
     'mhttpd'
-#   'mlogger'
+    'mlogger'
 )
 
 export EXPT_FE=(
