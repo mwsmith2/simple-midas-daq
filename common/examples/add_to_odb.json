@@ -1,0 +1,66 @@
+{
+    "/Experiment/Run Parameters/Comment": {
+        "type": "string",
+        "value": "test"
+    },
+    
+    "/Experiment/Edit On Start/Comment": {
+        "type": "link",
+        "value": "/Experiment/Run Parameters/Comment"
+    },
+
+    "/Logger/Data Dir": { 
+        "type": "path",
+        "value": "resources/data"
+    },
+
+    "/Logger/Message File": {
+        "type": "path",
+        "value": "resources/log/midas.log"
+    },
+
+    "/Logger/ODB Dump File": {
+        "type": "path",
+        "value": "resources/history/run%05d.xml"
+    },
+        
+    "/Logger/Elog Dir": {
+        "type": "path",
+        "value": "resources/elog"
+    },
+
+    "/Logger/Log Dir": {
+        "type": "path",
+        "value": "resources/log"
+    },
+
+    "/Logger/History Dir": {
+        "type": "path",
+        "value": "resources/history"
+    },
+
+    "/Custom/SIS-3302 Monitor": {
+        "type": "path",
+        "value": "online/www/sis3302-monitor.html"
+    },
+    
+    "/Custom/SIS-3316 Monitor": {
+        "type": "path",
+        "value": "online/www/sis3316-monitor.html"
+    },
+
+    "/Params/config-dir": {
+        "type": "path",
+        "value": "common/config/fnal"
+    },
+
+    "/Params/html-dir": {
+       "type": "path",
+       "value": "online/www"
+    },
+
+    "/Params/root-output": {
+        "type": "bool",
+        "value": "true"
+    }
+}

@@ -1,0 +1,35 @@
+#!/bin/bash
+# Store some useful experiment specific variables that are used by
+# scripts in one place
+
+export EXPT='simple-daq'
+export EXPT_IP='nmr-daq'
+export EXPT_DIR='/home/newg2/Applications/simple-daq'
+export MSERVER_PORT='7071'
+export MHTTPD_PORT='8081'
+export ROODY_PORT='9091'
+
+# Any external IPs that should be whitelisted.
+export EXT_IP=(
+    'nmr-cave'
+)
+
+# MIDAS utilities that this experiment needs running.
+export MIDAS_UTIL=(
+    'mserver'
+    'mhttpd'
+#   'mlogger'
+)
+
+# MIDAS frontends that should be launched with the experiment.
+export EXPT_FE=(
+    'fe_sis3316'
+    'fe_sis3302'
+)
+
+# MIDAS analyzers that should be launched with the experiment.
+export EXPT_AN=(
+    'an_online_monitor'
+)
+
+# end script
