@@ -41,12 +41,12 @@
 
     "/Custom/SIS-3302 Monitor": {
         "type": "path",
-        "value": "online/www/sis3302-monitor.html"
+        "value": "online/www/sis3302_monitor.html"
     },
     
     "/Custom/SIS-3316 Monitor": {
         "type": "path",
-        "value": "online/www/sis3316-monitor.html"
+        "value": "online/www/sis3316_monitor.html"
     },
 
     "/Params/config-dir": {
