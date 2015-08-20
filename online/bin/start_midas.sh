@@ -1,7 +1,7 @@
 #!/bin/bash
-# The script starts general midas utilites for simple-daq.
+# The script starts general midas utilites for the experiment.
 
-source /home/newg2/Applications/simple-daq/common/.expt-env
+source $(dirname $(readlink -f $0))/../../common/.expt-env
 
 odbedit -e $EXPT -c clean
 addresslist="-a $EXPT_IP -a localhost"

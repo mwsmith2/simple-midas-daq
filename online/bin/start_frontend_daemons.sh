@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Load our experiment environment variables
-source /home/newg2/Applications/simple-daq/common/.expt-env
+source $(dirname $(readlink -f $0))/../../common/.expt-env
 
 odbedit -e $EXPT -c 'clean'
 for fe in "${EXPT_FE[@]}"; do

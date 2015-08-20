@@ -1,7 +1,7 @@
 #!/bin/bash
 # Load the experiment variables.
 
-source /home/newg2/Applications/simple-daq/common/.expt-env
+source $(dirname $(readlink -f $0))/../../common/.expt-env
 
 for an in "${EXPT_AN[@]}"; do
     anname="${EXPT_DIR}/online/frontends/bin/${an}"

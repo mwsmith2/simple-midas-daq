@@ -1,7 +1,7 @@
 #!/bin/bash
-# The script starts general midas utilites for sis_wfd experiment.
+# The script starts general midas utilites for the experiment.
 
-source /home/newg2/Applications/simple-daq/common/.expt-env
+source $(dirname $(readlink -f $0))/../../common/.expt-env
 
 # The script kills general midas utilies.
 for session in $(screen -ls | grep -o "[0-9]*\.${EXPT}.mhttpd")
