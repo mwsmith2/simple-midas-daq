@@ -1,3 +1,6 @@
 [submodule "common/code/mhelper"]
 	path = common/code/mhelper
 	url = https://github.com/mwsmith2/mhelper
+[submodule "common/code/fast-daq-core"]
+	path = common/code/fast-daq-core
+	url = https://github.com/mwsmith2/fast-daq-core
