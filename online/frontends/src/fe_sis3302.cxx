@@ -348,10 +348,11 @@ INT read_trigger_event(char *pevent, INT off)
     }
   }
 
+  bk_init32(pevent);
+
   // And MIDAS output.
   if (write_midas) {
 
-    bk_init32(pevent);
     
     count = 0;
     for (auto &sis : data.sis_3302_vec) {
