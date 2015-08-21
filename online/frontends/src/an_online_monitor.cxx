@@ -92,7 +92,13 @@ namespace {
 
 // Histograms for a single SIS3302 digitizer.
 std::string figdir;
+std::atomic<bool> new_run_to_process;
+std::atomic<bool> time_for_breakdown;
+std::atomic<int> atomic_run_number;
+std::thread merge_root_thread;
 }
+
+void merge_data_loop();
 
 //-- Analyzer Init ---------------------------------------------------------//
 
@@ -101,6 +107,12 @@ INT analyzer_init()
   HNDLE hDB, hkey;
   char str[80];
   int i, size;
+
+  // Set up data merging thread.
+  ::new_run_to_process = false;
+  ::time_for_breakdown = false;
+  ::atomic_run_number = 0;
+  ::merge_root_thread = std::thread(merge_data_loop);
 
   // Register my own stop hook.
   cm_register_transition(TR_STOP, tr_stop_hook, 900);  
@@ -138,14 +150,14 @@ INT analyzer_init()
     char title[32], name[32], key[64], figpath[64];
 
     // Now add to the odb
-    sprintf(name, "sis3302_ch%02i_wf", i);
+    sprintf(name, "sis3316_ch%02i_wf", i);
     sprintf(key, "/Custom/Images/%s.gif/Background", name);
     sprintf(figpath, "%s/%s.gif", figdir.c_str(), name);
     db_create_key(hDB, 0, key, TID_STRING);
     db_set_value(hDB, 0, key, figpath, sizeof(figpath), 1, TID_STRING);
 
     // Now add to the odb
-    sprintf(name, "sis3302_ch%02i_fft", i);
+    sprintf(name, "sis3316_ch%02i_fft", i);
     sprintf(key, "/Custom/Images/%s.gif/Background", name);
     sprintf(figpath, "%s/%s.gif", figdir.c_str(), name);
     db_create_key(hDB, 0, key, TID_STRING);
@@ -177,6 +189,12 @@ INT analyzer_init()
 
 INT analyzer_exit()
 {
+  time_for_breakdown = true;
+
+  while(!merge_root_thread.joinable());
+  
+  merge_root_thread.join();
+
   return CM_SUCCESS;
 }
 
@@ -414,13 +432,24 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 }
 
 //-- Run Control Hooks -----------------------------------------------------//
-INT tr_stop_hook(INT run_number, char *error) {
+INT tr_stop_hook(INT run_number, char *error) 
+{
+  // Set the data merger info.
+  atomic_run_number = run_number;
+  new_run_to_process = true;
+  
+  return CM_SUCCESS;
+}
 
+
+//-- Run Control Hooks -----------------------------------------------------//
+void merge_data_loop()
+{
   //DATA part
   HNDLE hDB, hkey;
   INT status;
   char str[256], filename[256];
-  int size;
+  int size, run_number;
 
   TFile *pf_sis3302;
   TFile *pf_sis3316;
@@ -442,51 +471,62 @@ INT tr_stop_hook(INT run_number, char *error) {
     }
   }
 
-  // Open all the files.
-  sprintf(filename, "%sfe_sis3302_run_%05i.root", str, run_number);
-  pf_sis3302 = new TFile(filename);
-  if (!pf_sis3302->IsZombie()) {
-    pt_old_sis3302 = (TTree *)pf_sis3302->Get("t_sis3302");
-    std::cout << "Opened sis3302 file.\n";
-  } else {
-    std::cout << "Failed to open sis3302 file.\n";
-  }
-
-  sprintf(filename, "%s/fe_sis3316_run_%05i.root", str, run_number);
-  pf_sis3316 = new TFile(filename);
-  if (!pf_sis3316->IsZombie()) {
-    pt_old_sis3316 = (TTree *)pf_sis3316->Get("t_sis3316");
-    std::cout << "Opened sis3316 file.\n";
-  } else {
-    std::cout << "Failed to open sis3316 file.\n";
-  }
-
-  sprintf(filename, "%s/run_%05i.root", str, run_number);
-  pf_final = new TFile(filename, "recreate");
-
-  // Copy the trees from the other two and remove them.
-  pt_sis3302 = pt_old_sis3302->CloneTree();
-  pt_sis3316 = pt_old_sis3316->CloneTree();
-
-  pt_sis3302->Print();
-  pt_sis3316->Print();
-
-  pf_final->Write();
-
-  delete pf_final;
-  delete pf_sis3302;
-  delete pf_sis3316;
-
-  // Make sure the file was written and clean up.
-  pf_final = new TFile(filename);
-  
-  if (!pf_final->IsZombie()) {
-    char cmd[256];
-    sprintf(cmd, "rm %s/fe_sis33*_run_%05i.root", str, run_number);
-    system(cmd);
-  }
+  while (!time_for_breakdown) {
     
-  delete pf_final;
+    run_number = atomic_run_number;
+
+    if (new_run_to_process) {
+      // Open all the files.
+      sprintf(filename, "%sfe_sis3302_run_%05i.root", str, run_number);
+      pf_sis3302 = new TFile(filename);
+      if (!pf_sis3302->IsZombie()) {
+        pt_old_sis3302 = (TTree *)pf_sis3302->Get("t_sis3302");
+        std::cout << "Opened sis3302 file.\n";
+      } else {
+        std::cout << "Failed to open sis3302 file.\n";
+      }
+
+      sprintf(filename, "%s/fe_sis3316_run_%05i.root", str, run_number);
+      pf_sis3316 = new TFile(filename);
+      if (!pf_sis3316->IsZombie()) {
+        pt_old_sis3316 = (TTree *)pf_sis3316->Get("t_sis3316");
+        std::cout << "Opened sis3316 file.\n";
+      } else {
+        std::cout << "Failed to open sis3316 file.\n";
+      }
+
+      sprintf(filename, "%s/run_%05i.root", str, run_number);
+      pf_final = new TFile(filename, "recreate");
+
+      // Copy the trees from the other two and remove them.
+      pt_sis3302 = pt_old_sis3302->CloneTree();
+      pt_sis3316 = pt_old_sis3316->CloneTree();
+
+      pt_sis3302->Print();
+      pt_sis3316->Print();
+
+      pf_final->Write();
+
+      delete pf_final;
+      delete pf_sis3302;
+      delete pf_sis3316;
+
+      // Make sure the file was written and clean up.
+      pf_final = new TFile(filename);
+  
+      if (!pf_final->IsZombie()) {
+        char cmd[256];
+        sprintf(cmd, "rm %s/fe_sis33*_run_%05i.root", str, run_number);
+        system(cmd);
+      }
+    
+      delete pf_final;
+
+      ::new_run_to_process = false;
+    }
+    
+    usleep(100000);
+  }
 
   return CM_SUCCESS;
 }
