@@ -84,9 +84,9 @@ extern "C" {
          0,             // not used 
          "MIDAS",       // format 
          TRUE,          // enabled 
-         RO_RUNNING |   // read only when running 
-         RO_ODB,        // and update ODB 
-         500,           // poll for 500ms 
+         RO_RUNNING,// |   // read only when running 
+         //         RO_ODB,        // and update ODB 
+         25,            // poll for 500ms 
          0,             // stop run after this event limit 
          0,             // number of sub events 
          0,             // don't log history 
