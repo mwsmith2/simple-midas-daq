@@ -3,10 +3,20 @@
         "type": "string",
         "value": "test"
     },
+
+    "/Experiment/Run Parameters/Tags": {
+        "type": "string",
+        "value": "test"
+    },
     
     "/Experiment/Edit On Start/Comment": {
         "type": "link",
         "value": "/Experiment/Run Parameters/Comment"
+    },
+
+    "/Experiment/Edit On Start/Tags": {
+        "type": "link",
+        "value": "/Experiment/Run Parameters/Tags"
     },
 
     "/Logger/Data Dir": { 
@@ -21,7 +31,7 @@
 
     "/Logger/ODB Dump File": {
         "type": "path",
-        "value": "resources/history/run%05d.xml"
+        "value": "resources/history/run%05d_odb.xml"
     },
         
     "/Logger/Elog Dir": {
@@ -51,7 +61,17 @@
 
     "/Params/config-dir": {
         "type": "path",
-        "value": "common/config/fnal"
+        "value": "common/config"
+    },
+
+    "/Params/config-file/fe-sis3302": {
+        "type": "string",
+        "value": "fnal/fe_sis3302.json"
+    },
+
+    "/Params/config-file/fe-sis3316": {
+        "type": "string",
+        "value": "fnal/fe_sis3316.json"
     },
 
     "/Params/html-dir": {
