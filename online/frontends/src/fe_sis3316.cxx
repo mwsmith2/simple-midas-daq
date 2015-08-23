@@ -133,7 +133,14 @@ INT frontend_init()
   }
 
   conf_file = std::string(str);
-  conf_file += std::string("fe_sis3316.json");
+
+  db_find_key(hDB, 0, "Params/config-file/fe-sis3316", &hkey);
+  if (hkey) {
+    size = sizeof(str);
+    db_get_data(hDB, hkey, str, &size, TID_STRING);
+  }
+
+  conf_file += std::string(str);
 
   event_manager = new daq::EventManagerBasic(conf_file);
   return SUCCESS;
