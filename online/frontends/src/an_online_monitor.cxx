@@ -1,13 +1,13 @@
-/*----------------------------------------------------------------------------*\
-
-file:   an_sis3302.cxx
+/*---------------------------------------------------------------------------*\
+file:   an_online_monitor.cxx
 author: Matthias W. Smith
 email:  mwsmith2@uw.edu
 
 about:  Performs FFTs and plots those as well waveforms for simple
-        digitizer input.
+        digitizer input, SIS3302 and SIS3316 modules.  It also does some
+        work archiving configuration, runlogs, and merging ROOT output.
 
-\*----------------------------------------------------------------------------*/
+\*---------------------------------------------------------------------------*/
 
 //-- std includes ------------------------------------------------------------//
 #include <stdio.h>
@@ -93,12 +93,15 @@ namespace {
 // Histograms for a single SIS3302 digitizer.
 std::string figdir;
 std::atomic<bool> new_run_to_process;
+std::atomic<bool> new_config_to_archive;
 std::atomic<bool> time_for_breakdown;
 std::atomic<int> atomic_run_number;
 std::thread merge_root_thread;
+std::thread archive_config_thread;
 }
 
 void merge_data_loop();
+void archive_config_loop();
 
 //-- Analyzer Init ---------------------------------------------------------//
 
@@ -113,6 +116,7 @@ INT analyzer_init()
   ::time_for_breakdown = false;
   ::atomic_run_number = 0;
   ::merge_root_thread = std::thread(merge_data_loop);
+  ::archive_config_thread = std::thread(archive_config_loop);
 
   // Register my own stop hook.
   cm_register_transition(TR_STOP, tr_stop_hook, 900);  
@@ -437,6 +441,7 @@ INT tr_stop_hook(INT run_number, char *error)
   // Set the data merger info.
   atomic_run_number = run_number;
   new_run_to_process = true;
+  new_config_to_archive = true;
   
   return CM_SUCCESS;
 }
@@ -527,6 +532,142 @@ void merge_data_loop()
     
     usleep(100000);
   }
+}
 
-  return CM_SUCCESS;
+
+void archive_config_loop()
+{
+  using namespace boost::property_tree;
+
+  //DATA part
+  HNDLE hDB, hkey;
+  INT status;
+  char str[256], filename[256];
+  int size, run_number;
+  std::string histdir;
+  std::string confdir;
+
+  cm_get_experiment_database(&hDB, NULL);
+
+  db_find_key(hDB, 0, "/Logger/History dir", &hkey);
+  if (hkey) {
+    size = sizeof(str);
+    db_get_data(hDB, hkey, str, &size, TID_STRING);
+    if (str[strlen(str) - 1] != DIR_SEPARATOR) {
+      strcat(str, DIR_SEPARATOR_STR);
+    }
+  }
+
+  histdir = std::string(str);
+
+  db_find_key(hDB, 0, "/Params/config-dir", &hkey);
+  if (hkey) {
+    size = sizeof(str);
+    db_get_data(hDB, hkey, str, &size, TID_STRING);
+    if (str[strlen(str) - 1] != DIR_SEPARATOR) {
+      strcat(str, DIR_SEPARATOR_STR);
+    }
+  }
+
+  confdir = std::string(str);
+
+  while (!time_for_breakdown) {
+    
+    run_number = atomic_run_number;
+
+    if (new_config_to_archive) {
+
+      sprintf(str, "%srun%05d_config.json", histdir.c_str(), run_number);
+      std::string conf_archive(str);
+      std::string conf_file;
+      std::string str1;
+
+      ptree pt_archive;
+      ptree pt_temp;
+
+      // Open all the files.
+      db_find_key(hDB, 0, "/Params/config-file/fe-sis3302", &hkey);
+      if (hkey) {
+        size = sizeof(str);
+        db_get_data(hDB, hkey, str, &size, TID_STRING);
+
+        conf_file = confdir + std::string(str);
+        read_json(conf_file, pt_temp);
+
+        pt_archive.put_child("fe_sis3302", pt_temp);
+      }
+
+      // Open all the files.
+      db_find_key(hDB, 0, "/Params/config-file/fe-sis3316", &hkey);
+      if (hkey) {
+        size = sizeof(str);
+        db_get_data(hDB, hkey, str, &size, TID_STRING);
+
+        conf_file = confdir + std::string(str);
+        read_json(conf_file, pt_temp);
+
+        pt_archive.put_child("fe_sis3316", pt_temp);
+      }
+
+      // Now go through all the keys, and add the ones that are json files.
+      std::vector<std::string> keys;
+
+      // Get the keys first, otherwise it iterates over added keys too.
+      for (auto &kv : pt_archive)
+        keys.push_back(kv.first);
+
+      // Check the devices for each front-end.
+      for (auto &key : keys) {
+
+        for (auto &val : pt_archive.get_child(key).get_child("devices")) {
+
+          for (auto &val2 : val.second) {
+
+            try {
+              str1 = std::string(val2.second.data());
+              
+            } catch (...) {
+              
+              continue;
+            }
+
+            if (str1.find("json") != std::string::npos) {
+              
+              conf_file = confdir + str1;
+              read_json(conf_file, pt_temp);
+              
+              pt_archive.put_child(val2.first, pt_temp);
+              
+            }
+          }
+        }
+        
+        // And all the other first level keys.
+        for (auto &val : pt_archive.get_child(key)) {
+          
+          try {
+            str1 = std::string(val.second.data());
+
+          } catch (...) {
+
+            continue;
+          }
+
+          if (str1.find("json") != std::string::npos) {
+            
+            conf_file = confdir + str1;
+            read_json(conf_file, pt_temp);
+          
+            pt_archive.put_child(val.first, pt_temp);
+          }
+        }
+      }
+
+      // Write out the archive of config data.
+      write_json(conf_archive, pt_archive, std::locale(), false);
+      ::new_config_to_archive = false;
+    }
+    
+    usleep(100000);
+  }
 }
