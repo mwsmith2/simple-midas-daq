@@ -314,7 +314,7 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 
     // Set up the time vector.
     for (idx = 0; idx < SIS_3302_LN; idx++){
-      tm[idx] = -1.0 + idx * 0.0001;  // @10 MHz, t = [-1ms, 9ms]
+      tm[idx] = idx * 0.0001;  // @10 MHz, t = [0ms, 10ms]
     }
 
     // Copy and analyze each channel's FID separately.
@@ -379,7 +379,7 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 
     // Set up the time vector.
     for (idx = 0; idx < SIS_3316_LN; idx++){
-      tm[idx] = -1.0 + idx * 0.0001;  // @10 MHz, t = [-1ms, 9ms]
+      tm[idx] = idx * 0.0001;  // @10 MHz, t = [0ms, 10ms]
     }
 
     // Copy and analyze each channel's FID separately.
@@ -434,6 +434,7 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 
   return CM_SUCCESS;
 }
+
 
 //-- Run Control Hooks -----------------------------------------------------//
 INT tr_stop_hook(INT run_number, char *error) 
@@ -546,9 +547,11 @@ void archive_config_loop()
   int size, run_number;
   std::string histdir;
   std::string confdir;
+  std::string logdir;
 
   cm_get_experiment_database(&hDB, NULL);
 
+  // Get the history directory.
   db_find_key(hDB, 0, "/Logger/History dir", &hkey);
   if (hkey) {
     size = sizeof(str);
@@ -560,6 +563,19 @@ void archive_config_loop()
 
   histdir = std::string(str);
 
+  // Get the log directory.
+  db_find_key(hDB, 0, "/Logger/Log Dir", &hkey);
+  if (hkey) {
+    size = sizeof(str);
+    db_get_data(hDB, hkey, str, &size, TID_STRING);
+    if (str[strlen(str) - 1] != DIR_SEPARATOR) {
+      strcat(str, DIR_SEPARATOR_STR);
+    }
+  }
+
+  logdir = std::string(str);
+
+  // Get the config directory.
   db_find_key(hDB, 0, "/Params/config-dir", &hkey);
   if (hkey) {
     size = sizeof(str);
@@ -665,9 +681,54 @@ void archive_config_loop()
 
       // Write out the archive of config data.
       write_json(conf_archive, pt_archive, std::locale(), false);
+
+      // Now take care of the runlog file with Comments and tags.
+      ptree pt_runlog;
+      ptree pt_run;
+      std::string runlog_file = logdir + "runlog.json";
+
+      try {
+        read_json(runlog_file, pt_runlog);
+
+      } catch (...) {}
+
+      // Get the comment from the ODB
+      db_find_key(hDB, 0, "/Experiment/Run Parameters/Comment", &hkey);
+      if (hkey) {
+        size = sizeof(str);
+        db_get_data(hDB, hkey, str, &size, TID_STRING);
+
+        pt_run.put("comment", std::string(str));
+      }
+  
+
+      // Get the comment from the ODB
+      db_find_key(hDB, 0, "/Experiment/Run Parameters/Tags", &hkey);
+      if (hkey) {
+        size = sizeof(str);
+        db_get_data(hDB, hkey, str, &size, TID_STRING);
+    
+        ptree pt_tags;
+        std::string tag;
+        std::istringstream ss(str);
+        while (std::getline(ss, tag, ',')) {
+          ptree pt_tag;
+          pt_tag.put("", tag);
+          pt_tags.push_back(std::make_pair("", pt_tag));
+        }
+    
+        pt_run.put_child("tags", pt_tags);
+      }
+  
+      sprintf(str, "run_%05d", run_number);
+      pt_runlog.put_child(std::string(str), pt_run);
+
+      write_json(runlog_file, pt_runlog, std::locale(), true);
+
+      // Close the loop
       ::new_config_to_archive = false;
     }
-    
+
     usleep(100000);
   }
 }
