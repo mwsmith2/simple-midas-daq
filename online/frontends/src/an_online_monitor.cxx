@@ -90,17 +90,23 @@ ANALYZE_REQUEST analyze_request[] = {
 
 namespace {
 
-// Histograms for a single SIS3302 digitizer.
+// Histograms for a subset of MIDAS banks.
 std::string figdir;
+WORD p_sis3302[SIS_3302_CH][SIS_3302_LN];
+WORD p_sis3316[SIS_3316_CH][SIS_3316_LN];;
 std::atomic<bool> new_run_to_process;
 std::atomic<bool> new_config_to_archive;
+std::atomic<bool> new_sis3302_waveforms;
+std::atomic<bool> new_sis3316_waveforms;
 std::atomic<bool> time_for_breakdown;
 std::atomic<int> atomic_run_number;
 std::thread merge_root_thread;
+std::thread plot_waveforms_thread;
 std::thread archive_config_thread;
 }
 
 void merge_data_loop();
+void plot_waveforms_loop();
 void archive_config_loop();
 
 //-- Analyzer Init ---------------------------------------------------------//
@@ -117,6 +123,7 @@ INT analyzer_init()
   ::atomic_run_number = 0;
   ::merge_root_thread = std::thread(merge_data_loop);
   ::archive_config_thread = std::thread(archive_config_loop);
+  ::plot_waveforms_thread = std::thread(plot_waveforms_loop);
 
   // Register my own stop hook.
   cm_register_transition(TR_STOP, tr_stop_hook, 900);  
@@ -293,6 +300,31 @@ INT analyzer_loop()
 INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
 {
   // We need these for each FID, so keep them allocated.
+  unsigned int ch, idx;
+  WORD *pvme;
+  float *pfreq;
+
+  // Look for the first SIS3302 traces.
+  if (bk_locate(pevent, "02_0", &pvme) != 0) {
+
+    std::copy(&pvme[0], &pvme[SIS_3302_CH *SIS_3316_LN], &p_sis3302[0][0]);
+
+    new_sis3302_waveforms = true;
+  }
+
+  if (bk_locate(pevent, "16_0", &pvme) != 0) {
+
+    std::copy(&pvme[0], &pvme[SIS_3316_CH *SIS_3316_LN], &p_sis3316[0][0]);
+
+    new_sis3316_waveforms = true;
+  }
+
+  return CM_SUCCESS;
+}
+
+void plot_waveforms_loop()
+{
+  // We need these for each FID, so keep them allocated.
   static char title[32], name[32];
   static std::vector<double> wf;
   static std::vector<double> tm;
@@ -301,138 +333,133 @@ INT analyze_trigger_event(EVENT_HEADER * pheader, void *pevent)
   static TH1F *ph_fft = nullptr;
 
   unsigned int ch, idx;
-  WORD *pvme;
   float *pfreq;
 
   // Look for the first SIS3302 traces.
-  if (bk_locate(pevent, "02_0", &pvme) != 0) {
+  while (!time_for_breakdown) {
 
-    cm_msg(MINFO, "online_analyzer", "Processing a sis3302 event.");
+    if (new_sis3302_waveforms) {
+      
+      cm_msg(MINFO, "online_analyzer", "Processing a sis3302 event.");
+      
+      wf.resize(SIS_3302_LN);
+      tm.resize(SIS_3302_LN);
+      
+      // Set up the time vector.
+      for (idx = 0; idx < SIS_3302_LN; idx++){
+        tm[idx] = idx * 0.0001;  // @10 MHz, t = [0ms, 10ms]
+      }
 
-    wf.resize(SIS_3302_LN);
-    tm.resize(SIS_3302_LN);
+      // Copy and analyze each channel's FID separately.
+      for (ch = 0; ch < SIS_3302_CH; ++ch) {
 
-    // Set up the time vector.
-    for (idx = 0; idx < SIS_3302_LN; idx++){
-      tm[idx] = idx * 0.0001;  // @10 MHz, t = [0ms, 10ms]
+        std::copy(&p_sis3302[ch][0], &p_sis3302[ch + 1][0], wf.begin());
+        auto myfid = fid::FID(wf, tm);
+        
+        sprintf(name, "sis3302_ch%02i_wf", ch);
+        sprintf(title, "Channel %i Trace", ch);
+        ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
+                          myfid.tm()[myfid.tm().size() - 1]);
+      
+        sprintf(name, "sis3302_ch%02i_fft", ch);
+        sprintf(title, "Channel %i Fourier Transform", ch);
+        ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
+                          myfid.fftfreq()[myfid.fftfreq().size() - 1]);
+        
+        // One histogram gets the waveform and another with the fft power.
+        for (idx = 0; idx < myfid.power().size(); ++idx){
+          ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
+          ph_fft->SetBinContent(idx, myfid.power()[idx]);
+        }
+        
+        // The waveform has more samples.
+        for (; idx < SIS_3302_LN; ++idx) {
+          ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
+        }
+        
+        c1.SetLogx(0);
+        c1.SetLogy(0);
+        ph_wfm->Draw();
+        c1.Print(TString::Format("%s/%s.gif", 
+                                 figdir.c_str(), 
+                                 ph_wfm->GetName()));
+        c1.SetLogx(1);
+        c1.SetLogy(1);
+        ph_fft->Draw();
+        c1.Print(TString::Format("%s/%s.gif", 
+                                 figdir.c_str(), 
+                                 ph_fft->GetName()));
+        
+        if (ph_wfm != nullptr) {
+          delete ph_wfm;
+        }
+        
+        if (ph_fft != nullptr) {
+          delete ph_fft;
+        }
+      }
     }
-
-    // Copy and analyze each channel's FID separately.
-    for (ch = 0; ch < SIS_3302_CH; ++ch) {
-      std::copy(&pvme[ch*SIS_3302_LN], 
-                &pvme[(ch + 1)*SIS_3302_LN], 
-                wf.begin());
-
-      auto myfid = fid::FID(wf, tm);
-
-      sprintf(name, "sis3302_ch%02i_wf", ch);
-      sprintf(title, "Channel %i Trace", ch);
-      ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
-                        myfid.tm()[myfid.tm().size() - 1]);
+    
+    if (new_sis3316_waveforms) {
+      // Look for the first SIS3316 traces.
+      cm_msg(MINFO, "online_analyzer", "Processing a sis3316 event.");
       
-      sprintf(name, "sis3302_ch%02i_fft", ch);
-      sprintf(title, "Channel %i Fourier Transform", ch);
-      ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
-                        myfid.fftfreq()[myfid.fftfreq().size() - 1]);
-
-      // One histogram gets the waveform and another with the fft power.
-      for (idx = 0; idx < myfid.power().size(); ++idx){
-        ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
-        ph_fft->SetBinContent(idx, myfid.power()[idx]);
-      }
-
-      // The waveform has more samples.
-      for (; idx < SIS_3302_LN; ++idx) {
-        ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
+      wf.resize(SIS_3316_LN);
+      tm.resize(SIS_3316_LN);
+      
+      // Set up the time vector.
+      for (idx = 0; idx < SIS_3316_LN; idx++){
+        tm[idx] = idx * 0.0001;  // @10 MHz, t = [0ms, 10ms]
       }
       
-      c1.SetLogx(0);
-      c1.SetLogy(0);
-      ph_wfm->Draw();
-      c1.Print(TString::Format("%s/%s.gif", 
-                                  figdir.c_str(), 
-                                  ph_wfm->GetName()));
-      c1.SetLogx(1);
-      c1.SetLogy(1);
-      ph_fft->Draw();
-      c1.Print(TString::Format("%s/%s.gif", 
-                                  figdir.c_str(), 
-                                  ph_fft->GetName()));
-
-      if (ph_wfm != nullptr) {
-        delete ph_wfm;
-      }
-
-      if (ph_fft != nullptr) {
-        delete ph_fft;
-      }
-    }
-  }
-
-  // Look for the first SIS3316 traces.
-  if (bk_locate(pevent, "16_0", &pvme) != 0) {
-
-    cm_msg(MINFO, "online_analyzer", "Processing a sis3316 event.");
-
-    wf.resize(SIS_3316_LN);
-    tm.resize(SIS_3316_LN);
-
-    // Set up the time vector.
-    for (idx = 0; idx < SIS_3316_LN; idx++){
-      tm[idx] = idx * 0.0001;  // @10 MHz, t = [0ms, 10ms]
-    }
-
-    // Copy and analyze each channel's FID separately.
-    for (ch = 0; ch < SIS_3316_CH; ++ch) {
-
-      std::copy(&pvme[ch*SIS_3316_LN], 
-                &pvme[(ch + 1)*SIS_3316_LN], 
-                wf.begin());
-
-      auto myfid = fid::FID(wf, tm);
-
-      sprintf(name, "sis3316_ch%02i_wf", ch);
-      sprintf(title, "Channel %i Trace", ch + 1);
-      ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
-                        myfid.tm()[myfid.tm().size() - 1]);
-      
-      sprintf(name, "sis3316_ch%02i_fft", ch);
-      sprintf(title, "Channel %i Fourier Transform", ch + 1);
-      ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
-                        myfid.fftfreq()[myfid.fftfreq().size() - 1]);
-
-      // One histogram gets the waveform and another with the fft power.
-      for (idx = 0; idx < myfid.power().size(); ++idx){
-        ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
-        ph_fft->SetBinContent(idx, myfid.power()[idx]);
-      }
-
-      // The waveform has more samples.
-      for (; idx < SIS_3316_LN; ++idx) {
-        ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
-      }
-      
-      c1.SetLogx(0);
-      c1.SetLogy(0);
-      ph_wfm->Draw();
-      c1.Print(TString::Format("%s/%s.gif", figdir.c_str(), ph_wfm->GetName()));
-
-      c1.SetLogx(1);
-      c1.SetLogy(1);
-      ph_fft->Draw();
-      c1.Print(TString::Format("%s/%s.gif", figdir.c_str(), ph_fft->GetName()));
-
-      if (ph_wfm != nullptr) {
-        delete ph_wfm;
-      }
-
-      if (ph_fft != nullptr) {
-        delete ph_fft;
+      // Copy and analyze each channel's FID separately.
+      for (ch = 0; ch < SIS_3316_CH; ++ch) {
+        
+        std::copy(&p_sis3316[ch][0], &p_sis3316[ch + 1][0], wf.begin());
+        
+        auto myfid = fid::FID(wf, tm);
+        
+        sprintf(name, "sis3316_ch%02i_wf", ch);
+        sprintf(title, "Channel %i Trace", ch + 1);
+        ph_wfm = new TH1F(name, title, SIS_3316_LN, myfid.tm()[0], 
+                          myfid.tm()[myfid.tm().size() - 1]);
+        
+        sprintf(name, "sis3316_ch%02i_fft", ch);
+        sprintf(title, "Channel %i Fourier Transform", ch + 1);
+        ph_fft = new TH1F(name, title, SIS_3316_LN, myfid.fftfreq()[0], 
+                          myfid.fftfreq()[myfid.fftfreq().size() - 1]);
+        
+        // One histogram gets the waveform and another with the fft power.
+        for (idx = 0; idx < myfid.power().size(); ++idx){
+          ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
+          ph_fft->SetBinContent(idx, myfid.power()[idx]);
+        }
+        
+        // The waveform has more samples.
+        for (; idx < SIS_3316_LN; ++idx) {
+          ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
+        }
+        
+        c1.SetLogx(0);
+        c1.SetLogy(0);
+        ph_wfm->Draw();
+        c1.Print(TString::Format("%s/%s.gif", figdir.c_str(), ph_wfm->GetName()));
+        
+        c1.SetLogx(1);
+        c1.SetLogy(1);
+        ph_fft->Draw();
+        c1.Print(TString::Format("%s/%s.gif", figdir.c_str(), ph_fft->GetName()));
+        
+        if (ph_wfm != nullptr) {
+          delete ph_wfm;
+        }
+        
+        if (ph_fft != nullptr) {
+          delete ph_fft;
+        }
       }
     }
   }
-
-  return CM_SUCCESS;
 }
 
 
