@@ -92,6 +92,7 @@ namespace {
 
 // Histograms for a subset of MIDAS banks.
 std::string figdir;
+bool write_root;
 WORD p_sis3302[SIS_3302_CH][SIS_3302_LN];
 WORD p_sis3316[SIS_3316_CH][SIS_3316_LN];;
 std::atomic<bool> new_run_to_process;
@@ -114,7 +115,7 @@ void archive_config_loop();
 INT analyzer_init()
 {
   HNDLE hDB, hkey;
-  char str[80];
+  char str[256];
   int i, size;
 
   // Set up data merging thread.
@@ -139,6 +140,20 @@ INT analyzer_init()
     if (str[strlen(str) - 1] != DIR_SEPARATOR) {
       strcat(str, DIR_SEPARATOR_STR);
     }
+  }
+
+  db_find_key(hDB, 0, "/Params/root-output", &hkey);
+  if (hkey) {
+
+    BOOL mstatus;
+    size = sizeof(mstatus);
+
+    db_get_data(hDB, hkey, &mstatus, &size, TID_BOOL);
+    write_root = mstatus;
+
+  } else {
+
+    write_root = false;
   }
   
   // Filepaths are too long, so moving to /tmp
@@ -459,6 +474,8 @@ void plot_waveforms_loop()
         }
       }
     }
+
+    usleep(25000);
   }
 }
 
