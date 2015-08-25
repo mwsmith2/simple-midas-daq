@@ -119,7 +119,7 @@ INT frontend_init()
   string conf_file;
   HNDLE hDB, hkey;
   INT status, size;
-  char str[128];
+  char str[256];
   
   cm_get_experiment_database(&hDB, NULL);
   db_find_key(hDB, 0, "Params/config-dir", &hkey);
