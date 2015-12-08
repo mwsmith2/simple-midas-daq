@@ -25,7 +25,7 @@ UTILITIES = $(patsubst src/%.cxx,$(BIN_DIR)/%,$(wildcard src/vme*.cxx))
 OSFLAGS = -DOS_LINUX -DHAVE_USB -DHAVE_LIBUSB10 -Dextname
 CFLAGS = -g -fpermissive
 CXXFLAGS = -std=c++0x 
-LIBS = -lm -lz -lpthread -lfftw3 -lzmq -lcurl -lodbc 
+LIBS = -lm -lz -lpthread -lfftw3 -lzmq -lcurl -lodbc -lrt
 
 # ROOT flags and libs
 ROOTFLAGS = $(shell root-config --cflags)
