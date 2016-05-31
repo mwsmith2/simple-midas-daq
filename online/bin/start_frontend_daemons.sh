@@ -5,7 +5,7 @@ source $(dirname $(readlink -f $0))/../../common/.expt-env
 
 odbedit -e $EXPT -c 'clean'
 for fe in "${EXPT_FE[@]}"; do
-    ${EXP_DIR}/online/frontends/bin/${fe} -e $EXPT -D
+    ${EXP_DIR}/common/bin/${fe} -e $EXPT -D
 done
 
 # end script

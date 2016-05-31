@@ -1,5 +1,5 @@
 #!/bin/bash
-# The script kills general midas utilites for the experiment.
+# The script kills general midas utilites for sis_wfd experiment.
 
 # Load experiment variables.
 source $(dirname $(readlink -f $0))/../../common/.expt-env

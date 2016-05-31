@@ -1,5 +1,5 @@
 #!/bin/bash
-# The script starts general midas utilites for the experiment.
+# The script starts general midas utilites for sis_wfd experiment.
 
 source $(dirname $(readlink -f $0))/../../common/.expt-env
 
