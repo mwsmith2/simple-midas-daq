@@ -9,13 +9,13 @@ about:  Performs FFTs and plots those as well waveforms for simple
 
 \*---------------------------------------------------------------------------*/
 
-//-- std includes ------------------------------------------------------------//
+//-- std includes -----------------------------------------------------------//
 #include <stdio.h>
 #include <time.h>
 #include <cstring>
 #include <iostream>
 
-//--- other includes ---------------------------------------------------------//
+//--- other includes --------------------------------------------------------//
 #include "TFile.h"
 #include "TTree.h"
 #include "TH1F.h"
@@ -25,12 +25,11 @@ about:  Performs FFTs and plots those as well waveforms for simple
 #define USE_ROOT 1
 #include "midas.h"
 
-//--- project includes -------------------------------------------------------//
-#include "experim.h"
+//--- project includes ------------------------------------------------------//
 #include "fid.h"
 #include "common.hh"
 
-//--- globals ----------------------------------------------------------------//
+//--- globals ---------------------------------------------------------------//
 
 // The analyzer name (client name) as seen by other MIDAS clients   
 char *analyzer_name = (char *)"online-monitor"; // MWS set
@@ -43,8 +42,6 @@ INT odb_size = DEFAULT_ODB_SIZE;
 
 // ODB structures 
 RUNINFO runinfo;
-GLOBAL_PARAM global_param;
-EXP_PARAM exp_param;
 
 int analyze_trigger_event(EVENT_HEADER * pheader, void *pevent);
 int analyze_scaler_event(EVENT_HEADER * pheader, void *pevent);
@@ -280,7 +277,6 @@ INT ana_end_of_run(INT run_number, char *error)
                  &n, &size, TID_DOUBLE, TRUE);
 
     fprintf(f, "%dk\t", (int) (n / 1000.0 + 0.5));
-    fprintf(f, "%s\n", exp_param.comment);
 
     fclose(f);
   }
@@ -369,7 +365,7 @@ void plot_waveforms_loop()
       for (ch = 0; ch < SIS_3302_CH; ++ch) {
 
         std::copy(&p_sis3302[ch][0], &p_sis3302[ch + 1][0], wf.begin());
-        auto myfid = fid::FID(wf, tm);
+        fid::Fid myfid(wf, tm);
         
         sprintf(name, "sis3302_ch%02i_wf", ch);
         sprintf(title, "Channel %i Trace", ch);
@@ -382,9 +378,9 @@ void plot_waveforms_loop()
                           myfid.fftfreq()[myfid.fftfreq().size() - 1]);
         
         // One histogram gets the waveform and another with the fft power.
-        for (idx = 0; idx < myfid.power().size(); ++idx){
+        for (idx = 0; idx < myfid.psd().size(); ++idx){
           ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
-          ph_fft->SetBinContent(idx, myfid.power()[idx]);
+          ph_fft->SetBinContent(idx, myfid.psd()[idx]);
         }
         
         // The waveform has more samples.
@@ -432,7 +428,7 @@ void plot_waveforms_loop()
         
         std::copy(&p_sis3316[ch][0], &p_sis3316[ch + 1][0], wf.begin());
         
-        auto myfid = fid::FID(wf, tm);
+        fid::Fid myfid(wf, tm);
         
         sprintf(name, "sis3316_ch%02i_wf", ch);
         sprintf(title, "Channel %i Trace", ch + 1);
@@ -445,9 +441,9 @@ void plot_waveforms_loop()
                           myfid.fftfreq()[myfid.fftfreq().size() - 1]);
         
         // One histogram gets the waveform and another with the fft power.
-        for (idx = 0; idx < myfid.power().size(); ++idx){
+        for (idx = 0; idx < myfid.psd().size(); ++idx){
           ph_wfm->SetBinContent(idx, myfid.wf()[idx]);
-          ph_fft->SetBinContent(idx, myfid.power()[idx]);
+          ph_fft->SetBinContent(idx, myfid.psd()[idx]);
         }
         
         // The waveform has more samples.

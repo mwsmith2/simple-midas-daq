@@ -5,8 +5,8 @@ Author: Matthias W. Smith
 Email:  mwsmith2@uw.edu
 
 About:  The code implements a MIDAS frontend that wraps basic routines
-        for Struck SIS3302 VME devices.  Its usage is foreseen as 
-        a general frontend for testing NMR probes and shimming the 
+        for Struck SIS3302 VME devices.  Its usage is foreseen as
+        a general frontend for testing NMR probes and shimming the
         g-2 magnets. Its sister analyzer is an_vme_basic.
 
 \********************************************************************/
@@ -38,28 +38,28 @@ using std::string;
 //--- globals ------------------------------------------------------//
 
 extern "C" {
-  
+
   // The frontend name (client name) as seen by other MIDAS clients
   char *frontend_name = (char*) "fe-sis3302";
 
   // The frontend file name, don't change it.
   char *frontend_file_name = (char*) __FILE__;
-  
+
   // frontend_loop is called periodically if this variable is TRUE
   BOOL frontend_call_loop = FALSE;
-  
+
   // A frontend status page is displayed with this frequency in ms.
   INT display_period = 1000;
-  
+
   // maximum event size produced by this frontend
   INT max_event_size = 0x200000;
 
   // maximum event size for fragmented events (EQ_FRAGMENTED)
-  INT max_event_size_frag = 0x1000000;  
-  
+  INT max_event_size_frag = 0x1000000;
+
   // buffer size to hold events
   INT event_buffer_size = 0x8000000;
-  
+
   // Function declarations
   INT frontend_init();
   INT frontend_exit();
@@ -75,26 +75,26 @@ extern "C" {
 
   // Equipment list
 
-  EQUIPMENT equipment[] = 
+  EQUIPMENT equipment[] =
     {
-      {"fe-sis3302",     // equipment name 
-       { 1, 0,          // event ID, trigger mask 
-         "SYSTEM",      // event buffer 
-         EQ_POLLED,     // equipment type 
-         0,             // not used 
-         "MIDAS",       // format 
-         TRUE,          // enabled 
-         RO_RUNNING, //|   // read only when running 
-         //         RO_ODB,        // and update ODB 
-         25,            // poll for 500ms 
-         0,             // stop run after this event limit 
-         0,             // number of sub events 
-         0,             // don't log history 
+      {"fe-sis3302",     // equipment name
+       { 1, 0,          // event ID, trigger mask
+         "SYSTEM",      // event buffer
+         EQ_POLLED,     // equipment type
+         0,             // not used
+         "MIDAS",       // format
+         TRUE,          // enabled
+         RO_RUNNING, //|   // read only when running
+         //         RO_ODB,        // and update ODB
+         25,            // poll for 500ms
+         0,             // stop run after this event limit
+         0,             // number of sub events
+         0,             // don't log history
          "", "", "",
        },
-       read_trigger_event,      // readout routine 
+       read_trigger_event,      // readout routine
       },
-      
+
       {""}
     };
 
@@ -107,23 +107,23 @@ namespace {
 TFile* root_file;
 TTree* t;
 bool run_in_progress = false;
-bool write_midas = true;
+bool write_midas = false;
 bool write_root = true;
 daq::event_data data;
 daq::EventManagerBasic* event_manager;
 }
 
 //--- Frontend Init -------------------------------------------------//
-INT frontend_init() 
+INT frontend_init()
 {
   string conf_file;
   HNDLE hDB, hkey;
   INT status, size;
   char str[256];
-  
+
   cm_get_experiment_database(&hDB, NULL);
   db_find_key(hDB, 0, "Params/config-dir", &hkey);
-    
+
   if (hkey) {
     size = sizeof(str);
     db_get_data(hDB, hkey, str, &size, TID_STRING);
@@ -166,10 +166,10 @@ INT begin_of_run(INT run_number, char *error)
   BOOL mstatus;
   char str[256], filename[256];
   int size;
-    
+
   cm_get_experiment_database(&hDB, NULL);
   db_find_key(hDB, 0, "/Logger/Data dir", &hkey);
-    
+
   if (hkey) {
     size = sizeof(str);
     db_get_data(hDB, hkey, str, &size, TID_STRING);
@@ -177,7 +177,7 @@ INT begin_of_run(INT run_number, char *error)
       strcat(str, DIR_SEPARATOR_STR);
     }
   }
-    
+
   db_find_key(hDB, 0, "/Runinfo", &hkey);
   if (db_open_record(hDB, hkey, &runinfo, sizeof(runinfo), MODE_READ,
 		     NULL, NULL) != DB_SUCCESS) {
@@ -221,7 +221,7 @@ INT begin_of_run(INT run_number, char *error)
       sprintf(branch_name, "sis_3302_%i", count);
       sprintf(branch_vars, "system_clock/l:device_clock[%i]/l:trace[%i][%i]/s",
               SIS_3302_CH, SIS_3302_CH, SIS_3302_LN);
-    
+
       t->Branch(branch_name, &data.sis_3302_vec[count++], branch_vars);
     }
   }
@@ -243,13 +243,13 @@ INT end_of_run(INT run_number, char *error)
 
       t->Write();
       root_file->Close();
-    
+
       delete root_file;
     }
 
     run_in_progress = false;
   }
-  
+
   return SUCCESS;
 }
 
@@ -279,7 +279,7 @@ INT frontend_loop()
 //-------------------------------------------------------------------*/
 
 /********************************************************************\
-  
+
   Readout routines for different events
 
 \********************************************************************/
@@ -298,7 +298,7 @@ INT poll_event(INT source, INT count, BOOL test) {
     }
     return 0;
   }
-    
+
   return ((event_manager->HasEvent() == true)? 1 : 0);
 }
 
@@ -360,14 +360,14 @@ INT read_trigger_event(char *pevent, INT off)
   // And MIDAS output.
   if (write_midas) {
 
-    
+
     count = 0;
     for (auto &sis : data.sis_3302_vec) {
-      
+
       sprintf(bk_name, "02_%01i", count++);
       bk_create(pevent, bk_name, TID_WORD, &pdata);
-      std::copy(&sis.trace[0][0], 
-                &sis.trace[0][0] + SIS_3302_CH*SIS_3302_LN, 
+      std::copy(&sis.trace[0][0],
+                &sis.trace[0][0] + SIS_3302_CH*SIS_3302_LN,
                 pdata);
       pdata += sizeof(sis.trace) / sizeof(sis.trace[0][0]);
       bk_close(pevent, pdata);
